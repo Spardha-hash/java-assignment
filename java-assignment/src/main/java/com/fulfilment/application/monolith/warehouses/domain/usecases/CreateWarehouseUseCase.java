@@ -1,10 +1,9 @@
 package com.fulfilment.application.monolith.warehouses.domain.usecases;
 
-import com.fulfilment.application.monolith.warehouses.domain.exceptions.InvalidWarehouseException;
 import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
 import com.fulfilment.application.monolith.warehouses.domain.ports.CreateWarehouseOperation;
-import com.fulfilment.application.monolith.warehouses.domain.ports.LocationResolver;
 import com.fulfilment.application.monolith.warehouses.domain.ports.WarehouseStore;
+import com.fulfilment.application.monolith.warehouses.domain.validators.WarehouseValidator;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.time.LocalDateTime;
 
@@ -12,29 +11,17 @@ import java.time.LocalDateTime;
 public class CreateWarehouseUseCase implements CreateWarehouseOperation {
 
   private final WarehouseStore warehouseStore;
-  private final LocationResolver locationResolver;
+  private final WarehouseValidator validator;
 
-  public CreateWarehouseUseCase(WarehouseStore warehouseStore, LocationResolver locationResolver) {
+  public CreateWarehouseUseCase(WarehouseStore warehouseStore, WarehouseValidator validator) {
     this.warehouseStore = warehouseStore;
-    this.locationResolver = locationResolver;
+    this.validator = validator;
   }
 
   @Override
   public void create(Warehouse warehouse) {
-    WarehouseValidator.validateBasics(warehouse);
+    validator.validateForCreation(warehouse);
 
-    // Business Unit Code Verification
-    if (warehouseStore.findByBusinessUnitCode(warehouse.businessUnitCode) != null) {
-      throw new InvalidWarehouseException(
-          "A warehouse with business unit code '"
-              + warehouse.businessUnitCode
-              + "' already exists.");
-    }
-
-    // Location, feasibility, capacity and stock validations
-    WarehouseValidator.validateLocationFit(warehouse, locationResolver, warehouseStore, null);
-
-    // if all went well, create the warehouse
     warehouse.createdAt = LocalDateTime.now();
     warehouse.archivedAt = null;
     warehouseStore.create(warehouse);

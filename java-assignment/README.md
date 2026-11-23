@@ -93,7 +93,7 @@ java -jar ./target/quarkus-app/quarkus-run.jar
 
 Navigate to:
 
-<http://localhost:8080/index.html>
+<http://localhost:8082/index.html>
 
 Have fun, and join the team of contributors!
 

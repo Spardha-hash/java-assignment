@@ -10,6 +10,7 @@ import com.fulfilment.application.monolith.location.LocationGateway;
 import com.fulfilment.application.monolith.warehouses.domain.exceptions.InvalidWarehouseException;
 import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseNotFoundException;
 import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
+import com.fulfilment.application.monolith.warehouses.domain.validators.WarehouseValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +23,7 @@ public class ReplaceWarehouseUseCaseTest {
   @BeforeEach
   void setUp() {
     store = new InMemoryWarehouseStore();
-    useCase = new ReplaceWarehouseUseCase(store, new LocationGateway());
+    useCase = new ReplaceWarehouseUseCase(store, new WarehouseValidator(store, new LocationGateway()));
     current = warehouse("MWH.012", "AMSTERDAM-001", 50, 5);
     store.create(current);
   }

@@ -1,9 +1,9 @@
 package com.fulfilment.application.monolith.warehouses.domain.usecases;
 
-import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseNotFoundException;
 import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
 import com.fulfilment.application.monolith.warehouses.domain.ports.ArchiveWarehouseOperation;
 import com.fulfilment.application.monolith.warehouses.domain.ports.WarehouseStore;
+import com.fulfilment.application.monolith.warehouses.domain.validators.WarehouseValidator;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.time.LocalDateTime;
 
@@ -11,16 +11,16 @@ import java.time.LocalDateTime;
 public class ArchiveWarehouseUseCase implements ArchiveWarehouseOperation {
 
   private final WarehouseStore warehouseStore;
+  private final WarehouseValidator validator;
 
-  public ArchiveWarehouseUseCase(WarehouseStore warehouseStore) {
+  public ArchiveWarehouseUseCase(WarehouseStore warehouseStore, WarehouseValidator validator) {
     this.warehouseStore = warehouseStore;
+    this.validator = validator;
   }
 
   @Override
   public void archive(Warehouse warehouse) {
-    if (warehouse == null || warehouse.archivedAt != null) {
-      throw new WarehouseNotFoundException("No active warehouse to archive.");
-    }
+    validator.validateForArchive(warehouse);
 
     warehouse.archivedAt = LocalDateTime.now();
 

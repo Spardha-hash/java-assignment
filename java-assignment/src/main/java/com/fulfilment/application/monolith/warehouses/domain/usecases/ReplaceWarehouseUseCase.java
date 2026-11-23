@@ -1,11 +1,10 @@
 package com.fulfilment.application.monolith.warehouses.domain.usecases;
 
-import com.fulfilment.application.monolith.warehouses.domain.exceptions.InvalidWarehouseException;
 import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseNotFoundException;
 import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
-import com.fulfilment.application.monolith.warehouses.domain.ports.LocationResolver;
 import com.fulfilment.application.monolith.warehouses.domain.ports.ReplaceWarehouseOperation;
 import com.fulfilment.application.monolith.warehouses.domain.ports.WarehouseStore;
+import com.fulfilment.application.monolith.warehouses.domain.validators.WarehouseValidator;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.time.LocalDateTime;
 
@@ -19,16 +18,16 @@ import java.time.LocalDateTime;
 public class ReplaceWarehouseUseCase implements ReplaceWarehouseOperation {
 
   private final WarehouseStore warehouseStore;
-  private final LocationResolver locationResolver;
+  private final WarehouseValidator validator;
 
-  public ReplaceWarehouseUseCase(WarehouseStore warehouseStore, LocationResolver locationResolver) {
+  public ReplaceWarehouseUseCase(WarehouseStore warehouseStore, WarehouseValidator validator) {
     this.warehouseStore = warehouseStore;
-    this.locationResolver = locationResolver;
+    this.validator = validator;
   }
 
   @Override
   public void replace(Warehouse newWarehouse) {
-    WarehouseValidator.validateBasics(newWarehouse);
+    validator.validateBasics(newWarehouse);
 
     Warehouse current = warehouseStore.findByBusinessUnitCode(newWarehouse.businessUnitCode);
     if (current == null) {
@@ -38,29 +37,7 @@ public class ReplaceWarehouseUseCase implements ReplaceWarehouseOperation {
               + "'.");
     }
 
-    // Stock Matching
-    if (!newWarehouse.stock.equals(current.stock)) {
-      throw new InvalidWarehouseException(
-          "Stock of the new warehouse ("
-              + newWarehouse.stock
-              + ") must match the stock of the warehouse being replaced ("
-              + current.stock
-              + ").");
-    }
-
-    // Capacity Accommodation
-    if (newWarehouse.capacity < current.stock) {
-      throw new InvalidWarehouseException(
-          "Capacity of the new warehouse ("
-              + newWarehouse.capacity
-              + ") cannot accommodate the stock of the warehouse being replaced ("
-              + current.stock
-              + ").");
-    }
-
-    // Location / max warehouses / location capacity (the replaced warehouse no longer counts)
-    WarehouseValidator.validateLocationFit(
-        newWarehouse, locationResolver, warehouseStore, current.businessUnitCode);
+    validator.validateForReplacement(newWarehouse, current);
 
     LocalDateTime now = LocalDateTime.now();
 

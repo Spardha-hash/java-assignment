@@ -1,18 +1,82 @@
-package com.fulfilment.application.monolith.warehouses.domain.usecases;
+package com.fulfilment.application.monolith.warehouses.domain.validators;
 
 import com.fulfilment.application.monolith.warehouses.domain.exceptions.InvalidWarehouseException;
+import com.fulfilment.application.monolith.warehouses.domain.exceptions.WarehouseNotFoundException;
 import com.fulfilment.application.monolith.warehouses.domain.models.Location;
 import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
 import com.fulfilment.application.monolith.warehouses.domain.ports.LocationResolver;
 import com.fulfilment.application.monolith.warehouses.domain.ports.WarehouseStore;
+import jakarta.enterprise.context.ApplicationScoped;
 import java.util.List;
 
-/** Validation rules shared by the create and replace use cases. */
-final class WarehouseValidator {
+/**
+ * All business-rule validation for warehouses lives here, so the use cases only orchestrate and
+ * every rule can be read (and tested) in one place.
+ */
+@ApplicationScoped
+public class WarehouseValidator {
 
-  private WarehouseValidator() {}
+  private final WarehouseStore warehouseStore;
+  private final LocationResolver locationResolver;
 
-  static void validateBasics(Warehouse warehouse) {
+  public WarehouseValidator(WarehouseStore warehouseStore, LocationResolver locationResolver) {
+    this.warehouseStore = warehouseStore;
+    this.locationResolver = locationResolver;
+  }
+
+  /** Rules for creating a brand-new warehouse. */
+  public void validateForCreation(Warehouse warehouse) {
+    validateBasics(warehouse);
+
+    // Business Unit Code Verification
+    if (warehouseStore.findByBusinessUnitCode(warehouse.businessUnitCode) != null) {
+      throw new InvalidWarehouseException(
+          "A warehouse with business unit code '"
+              + warehouse.businessUnitCode
+              + "' already exists.");
+    }
+
+    validateLocationFit(warehouse, null);
+  }
+
+  /**
+   * Rules for replacing the {@code current} active warehouse of a business unit by {@code
+   * replacement}.
+   */
+  public void validateForReplacement(Warehouse replacement, Warehouse current) {
+    // Stock Matching
+    if (!replacement.stock.equals(current.stock)) {
+      throw new InvalidWarehouseException(
+          "Stock of the new warehouse ("
+              + replacement.stock
+              + ") must match the stock of the warehouse being replaced ("
+              + current.stock
+              + ").");
+    }
+
+    // Capacity Accommodation
+    if (replacement.capacity < current.stock) {
+      throw new InvalidWarehouseException(
+          "Capacity of the new warehouse ("
+              + replacement.capacity
+              + ") cannot accommodate the stock of the warehouse being replaced ("
+              + current.stock
+              + ").");
+    }
+
+    // The warehouse being replaced no longer counts against the location limits
+    validateLocationFit(replacement, current.businessUnitCode);
+  }
+
+  /** Only an existing, still active warehouse can be archived. */
+  public void validateForArchive(Warehouse warehouse) {
+    if (warehouse == null || warehouse.archivedAt != null) {
+      throw new WarehouseNotFoundException("No active warehouse to archive.");
+    }
+  }
+
+  /** Required fields and value ranges. */
+  public void validateBasics(Warehouse warehouse) {
     if (warehouse == null) {
       throw new InvalidWarehouseException("Warehouse data must be provided.");
     }
@@ -31,17 +95,12 @@ final class WarehouseValidator {
   }
 
   /**
-   * Validates location existence, how many warehouses fit there and the location capacity.
+   * Location existence, number of warehouses allowed there, location capacity and stock vs capacity.
    *
    * @param ignoredBusinessUnitCode an active warehouse to leave out of the counts (the one being
    *     replaced), or null
    */
-  static void validateLocationFit(
-      Warehouse warehouse,
-      LocationResolver locationResolver,
-      WarehouseStore warehouseStore,
-      String ignoredBusinessUnitCode) {
-
+  private void validateLocationFit(Warehouse warehouse, String ignoredBusinessUnitCode) {
     // Location Validation
     Location location = locationResolver.resolveByIdentifier(warehouse.location);
     if (location == null) {
